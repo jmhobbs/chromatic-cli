@@ -2,7 +2,7 @@ import retry from 'async-retry';
 import fs from 'fs-extra';
 import progress from 'progress-stream';
 
-export default async function uploadZip(ctx, path, url, contentLength, onProgress) {
+export async function uploadZip(ctx, path, url, contentLength, onProgress) {
   let totalProgress = 0;
 
   ctx.log.debug(`Uploading ${contentLength} bytes for '${path}' to '${url}'`);
@@ -43,6 +43,24 @@ export default async function uploadZip(ctx, path, url, contentLength, onProgres
         ctx.log.debug('Retrying upload %s, %O', url, err);
         onProgress(totalProgress);
       },
+    }
+  );
+}
+
+export async function waitForUnpack(ctx, url) {
+  ctx.log.debug(`Waiting for zip unpack sentinel file to appear at '${url}'`);
+
+  return retry(
+    async () => {
+      const res = await ctx.http.fetch(url, {}, { retries: 0 });
+      if (!res.ok) {
+        throw new Error('Sentinel file not present.');
+      }
+      ctx.log.debug(`Sentinel file present, continuing.`);
+    },
+    {
+      retries: 10,
+      minTimeout: 500,
     }
   );
 }

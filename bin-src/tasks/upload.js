@@ -8,7 +8,7 @@ import { getDependentStoryFiles } from '../lib/getDependentStoryFiles';
 import { createTask, transitionTo } from '../lib/tasks';
 import makeZipFile from '../lib/compress';
 import uploadFiles from '../lib/uploadFiles';
-import uploadZip from '../lib/uploadZip';
+import { uploadZip, waitForUnpack } from '../lib/uploadZip';
 import deviatingOutputDir from '../ui/messages/warnings/deviatingOutputDir';
 import noStatsFile from '../ui/messages/warnings/noStatsFile';
 import {
@@ -43,11 +43,10 @@ const TesterGetZipUploadUrlMutation = `
     getZipUploadUrl {
       domain
       url
+      sentinelUrl
     }
   }
 `;
-
-const UNPACK_WAIT = 2500;
 
 // Get all paths in rootDir, starting at dirname.
 // We don't want the paths to include rootDir -- so if rootDir = storybook-static,
@@ -179,7 +178,7 @@ async function uploadAsZipFile(ctx, task) {
   const zipped = await makeZipFile(ctx);
   const { path, size: total } = zipped;
   const { getZipUploadUrl } = await ctx.client.runQuery(TesterGetZipUploadUrlMutation);
-  const { domain, url } = getZipUploadUrl;
+  const { domain, url, sentinelUrl } = getZipUploadUrl;
 
   task.output = starting(ctx).output;
 
@@ -200,7 +199,7 @@ async function uploadAsZipFile(ctx, task) {
   ctx.uploadedBytes = total;
   ctx.isolatorUrl = new URL('/iframe.html', domain).toString();
 
-  return new Promise((resolve, _) => setTimeout(resolve, UNPACK_WAIT));
+  return waitForUnpack(ctx, sentinelUrl);
 }
 
 export const uploadStorybook = async (ctx, task) => {
