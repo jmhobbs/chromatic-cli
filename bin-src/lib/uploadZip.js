@@ -2,6 +2,8 @@ import retry from 'async-retry';
 import fs from 'fs-extra';
 import progress from 'progress-stream';
 
+const SENTINEL_SUCCESS_VALUE = 'OK';
+
 export async function uploadZip(ctx, path, url, contentLength, onProgress) {
   let totalProgress = 0;
 
@@ -51,16 +53,26 @@ export async function waitForUnpack(ctx, url) {
   ctx.log.debug(`Waiting for zip unpack sentinel file to appear at '${url}'`);
 
   return retry(
-    async () => {
-      const res = await ctx.http.fetch(url, {}, { retries: 0 });
+    async (bail) => {
+      const res = await ctx.http.fetch(
+        url,
+        { headers: { 'user-agent': 'Chromatic' } },
+        { retries: 0 }
+      );
       if (!res.ok) {
         throw new Error('Sentinel file not present.');
       }
-      ctx.log.debug(`Sentinel file present, continuing.`);
+      const result = await res.text();
+      if (SENTINEL_SUCCESS_VALUE !== result) {
+        bail(new Error('Zip file failed to unpack remotely.'));
+      } else {
+        ctx.log.debug(`Sentinel file present, continuing.`);
+      }
     },
     {
-      retries: 10,
+      retries: 30,
       minTimeout: 500,
+      maxTimeout: 1000,
     }
   );
 }
