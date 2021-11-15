@@ -56,7 +56,12 @@ export async function waitForUnpack(ctx, url) {
     async (bail) => {
       const res = await ctx.http.fetch(
         url,
-        { headers: { 'user-agent': 'Chromatic' } },
+        {
+          headers: {
+            'user-agent': 'Chromatic',
+            'cache-control': 'no-cache',
+          },
+        },
         { retries: 0 }
       );
       if (!res.ok) {
